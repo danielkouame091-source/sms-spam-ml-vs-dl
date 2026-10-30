@@ -10,6 +10,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import accuracy_score, classification_report, f1_score
+from sklearn.model_selection import train_test_split
 from tensorflow import keras
 from tensorflow.keras import layers
 
@@ -20,15 +21,40 @@ keras.utils.set_random_seed(42)
 X_train, X_test, y_train, y_test = load_split()
 print(f"Training messages: {len(X_train)} | Test messages: {len(X_test)}")
 
-# The network needs text as an array of shape (n, 1) and labels as 0 / 1
-x_train = np.array(X_train.tolist()).reshape(-1, 1)
-x_test = np.array(X_test.tolist()).reshape(-1, 1)
+# Labels as numbers: 1 = spam, 0 = ham
 y_train_num = (y_train == "spam").astype("float32").to_numpy()
-y_test_num = (y_test == "spam").astype("float32").to_numpy()
+
+# Keep 10% of the training messages to watch the network while it learns
+X_fit, X_val, y_fit, y_val = train_test_split(
+    X_train.to_numpy(),
+    y_train_num,
+    test_size=0.1,
+    random_state=42,
+    stratify=y_train_num,
+)
+
+
+def make_dataset(texts, labels=None, shuffle=False):
+    """Pack the messages into a TensorFlow dataset (texts as 'string' tensors)."""
+    texts = tf.constant([str(t) for t in texts], dtype=tf.string)
+    texts = tf.reshape(texts, (-1, 1))
+    if labels is None:
+        dataset = tf.data.Dataset.from_tensor_slices(texts)
+    else:
+        labels = tf.constant(labels, dtype=tf.float32)
+        dataset = tf.data.Dataset.from_tensor_slices((texts, labels))
+    if shuffle:
+        dataset = dataset.shuffle(len(texts), seed=42)
+    return dataset.batch(32)
+
+
+train_ds = make_dataset(X_fit, y_fit, shuffle=True)
+val_ds = make_dataset(X_val, y_val)
+test_ds = make_dataset(X_test)
 
 # Layer that turns words into numbers (it learns the vocabulary from the training texts)
 vectorize = layers.TextVectorization(max_tokens=10000, output_sequence_length=60)
-vectorize.adapt(x_train.ravel())
+vectorize.adapt(tf.data.Dataset.from_tensor_slices([str(t) for t in X_fit]).batch(256))
 
 # The neural network
 model = keras.Sequential(
@@ -53,11 +79,9 @@ early_stop = keras.callbacks.EarlyStopping(
 
 start = time.time()
 model.fit(
-    x_train,
-    y_train_num,
+    train_ds,
     epochs=10,
-    batch_size=32,
-    validation_split=0.1,
+    validation_data=val_ds,
     class_weight={0: 1.0, 1: 2.0},  # spam is rarer, so we give it more weight
     callbacks=[early_stop],
     verbose=2,
@@ -65,7 +89,7 @@ model.fit(
 training_seconds = round(time.time() - start, 2)
 
 # Evaluate on messages the model has never seen
-probabilities = model.predict(x_test, verbose=0).ravel()
+probabilities = model.predict(test_ds, verbose=0).ravel()
 predictions = np.where(probabilities >= 0.5, "spam", "ham")
 accuracy = accuracy_score(y_test, predictions)
 f1 = f1_score(y_test, predictions, pos_label="spam")
