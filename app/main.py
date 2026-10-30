@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import joblib
-import numpy as np
 import streamlit as st
 
 # Main project folder (the folder above "app")
@@ -80,7 +79,11 @@ if st.button("🔍 Predict"):
             if dl_model is None:
                 st.info("Deep learning model not available.")
             else:
-                probability = float(dl_model.predict(np.array([[message]]), verbose=0)[0][0])
+                import tensorflow as tf
+
+                # Send the text as a TensorFlow string tensor (shape 1 x 1)
+                prediction = dl_model(tf.constant([[message]]), training=False)
+                probability = float(prediction.numpy()[0][0])
                 if probability >= 0.5:
                     st.error(f"🚨 SPAM ({probability:.1%})")
                 else:

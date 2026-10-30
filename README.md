@@ -38,7 +38,13 @@ Files created by the scripts: `svm_model.pkl`, `tfidf_vectorizer.pkl`,
 
 ## How to run
 
+Tested on macOS (Apple Silicon) with Python 3.11 and TensorFlow 2.21. A clean
+Python 3.11 environment is recommended, because TensorFlow can crash inside a
+large shared environment such as the Anaconda base environment.
+
 ```bash
+conda create -n spamdl python=3.11 -y
+conda activate spamdl
 pip3 install -r requirements.txt
 python3 train_ml.py      # trains the SVM
 python3 train_dl.py      # trains the neural network
@@ -48,21 +54,31 @@ streamlit run app/main.py
 
 ## Results (test set, 1,034 messages)
 
-| Model | Accuracy | F1-score (spam) |
-|---|---|---|
-| SVM (machine learning) | 0.9807 | 0.9180 |
-| Neural network (deep learning) | run `train_dl.py` | run `train_dl.py` |
+| Model | Accuracy | F1-score (spam) | Precision (spam) | Recall (spam) | Training time |
+|---|---|---|---|---|---|
+| SVM (machine learning) | 0.9797 | 0.9143 | 0.98 | 0.85 | 0.01 s |
+| Neural network (deep learning) | 0.9797 | 0.9150 | 0.97 | 0.86 | 4.68 s |
 
-The SVM detects 99% of the messages it calls spam correctly (precision 0.99)
-but misses 15% of the real spam (recall 0.85).
+Both models classify normal messages almost perfectly (recall 1.00 on `ham`).
+The difficult part is spam: about 14 to 15% of the real spam messages are
+missed by both models, while 97 to 98% of the messages they call spam really
+are spam.
 
 ## Conclusion
 
-The SVM is extremely fast to train (a fraction of a second) and already very
-accurate on this small dataset. The neural network needs more time and more
-libraries, and its advantage depends on the data size. On short and noisy
-texts like SMS, a simple model with good features is a strong baseline.
-Fill in the final comparison after running `compare.py`.
+On this dataset, machine learning and deep learning reach the same accuracy
+(0.9797). The neural network has a slightly higher F1-score on the spam class
+(0.9150 against 0.9143), but this difference is tiny. The test set contains
+only 131 spam messages, so one message more or less changes the score by
+more than that. We cannot say that one model is really better.
+
+The real difference is the cost. The SVM trains in 0.01 seconds with a single
+library, while the neural network needs 4.68 seconds, TensorFlow and a more
+complex setup. For short SMS texts and a small dataset, a simple model with
+good features (TF-IDF + SVM) is a strong baseline. Deep learning would
+probably become more useful with a much larger dataset or with longer and more
+varied texts. These results come from one run with one random split, so they
+should be confirmed with cross-validation before drawing a final conclusion.
 
 ## Author
 
